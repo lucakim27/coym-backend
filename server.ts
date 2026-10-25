@@ -10,11 +10,14 @@ import majorRouter from "./routes/majorRoute";
 import replyRouter from "./routes/replyRoute";
 import requestRouter from "./routes/requestRoute";
 import testRouter from "./routes/testRoute";
+import cors from "cors";
+import { corsOptions } from "./configs/cors";
 
 const app = express();
 const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 10000;
 
+app.use(cors(corsOptions));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
