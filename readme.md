@@ -101,7 +101,7 @@ All routes are registered at the server root; there is no homepage route at `/`.
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `POST` | `/signUp` | Create an account |
-| `GET` | `/signIn` | Sign in |
+| `POST` | `/signIn` | Sign in |
 | `GET` | `/cookieValidation` | Validate the session cookie |
 | `GET` | `/getUserDetails` | Get the signed-in user's profile |
 | `POST` | `/updateUserDetails` | Update profile details |

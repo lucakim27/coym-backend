@@ -1,37 +1,5 @@
 import { pool } from '../configs/db'
 
-export const addAccount = function (username: any, password: any) {
-
-    const insertAccountsQuery = `INSERT INTO
-        accounts (
-            username, 
-            password,
-            createdAt
-        ) VALUES (
-            ?, 
-            ?,
-            ?
-        )
-    `
-    
-    const paramsForInsertAccountsQuery = [username, password, new Date().toISOString().slice(0, 19).replace('T', ' ')]
-
-    pool.getConnection(function (err: any, connection: any) {
-        if (err) {
-            console.error('DB connection error:', err);
-            return;
-        }
-        connection.query(insertAccountsQuery, paramsForInsertAccountsQuery, function (err: any, result: any) {
-            connection.release()
-            if (err) {
-                console.error('Query error:', err);
-                return;
-            }
-        })
-    })
-
-}
-
 const validateSignUp = function (username: any, password: any, passwordConfirm: any) {
     if (username.length < 6 || password !== passwordConfirm || username.includes(" ") || password.includes(" ")) {
         return 1
@@ -41,126 +9,107 @@ const validateSignUp = function (username: any, password: any, passwordConfirm: 
 }
 
 export const authSignUp = function (res: any, req: any) {
+    const { username, password, passwordConfirm } = req.body
+    res.set('Cache-Control', 'no-store')
 
-    const selectAccountsQuery = "SELECT username, password FROM accounts"
-
-    if (validateSignUp(req.body.username, req.body.password, req.body.passwordConfirm)) {
+    if (validateSignUp(username, password, passwordConfirm)) {
         res.send({
             status: false,
             message: 'Follow the conditions for the username and password above please.'
         })
-    } else {
-        pool.getConnection(function (err: any, connection: any) {
-            if (err) {
-                console.error('DB connection error:', err);
-                return;
-            }
-            connection.query(selectAccountsQuery, function (err: any, result: any, fields: any) {
-                connection.release()
-                if (err) {
-                    console.error('Query error:', err);
-                    return;
-                }
-                if (result.length !== 0) {
-                    var existing = false
-                    for (var i = 0; i < result.length; i++) {
-                        if (req.body.username === result[i].username || req.body.password === result[i].password) {
-                            res.send({
-                                status: false,
-                                message: 'It already exists.'
-                            })
-                            existing = true
-                        }
-                    }
-                    if (!existing) {
-                        addAccount(req.body.username, req.body.password)
-                        res.send({
-                            status: true,
-                            message: 'Successfully signed up.'
-                        })
-                    }
-                } else {
-                    addAccount(req.body.username, req.body.password)
-                    res.send({
-                        status: true,
-                        message: 'Successfully signed up.'
-                    })
-                }
-            })
-        })
-
+        return
     }
-}
-
-export const authSignIn = function (res: any, req: any) {
-
-    const selectAccountsQuery = "SELECT username, password FROM accounts"
 
     pool.getConnection(function (err: any, connection: any) {
         if (err) {
-            console.error('DB connection error:', err);
+            console.error('DB connection error:', err)
+            res.status(500).send({ status: false, message: 'Unable to create account.' })
+            return
+        }
+
+        connection.query('SELECT id FROM accounts WHERE username = ? LIMIT 1', [username], function (selectErr: any, result: any) {
+            if (selectErr) {
+                connection.release()
+                console.error('Query error:', selectErr)
+                res.status(500).send({ status: false, message: 'Unable to create account.' })
+                return
+            }
+
+            if (result.length > 0) {
+                connection.release()
+                res.send({ status: false, message: 'It already exists.' })
+                return
+            }
+
+            const insertQuery = `INSERT INTO accounts (username, password, createdAt) VALUES (?, ?, ?)`
+            const createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ')
+            connection.query(insertQuery, [username, password, createdAt], function (insertErr: any) {
+                connection.release()
+                if (insertErr) {
+                    console.error('Query error:', insertErr)
+                    res.status(500).send({ status: false, message: 'Unable to create account.' })
+                    return
+                }
+
+                res.send({ status: true, message: 'Successfully signed up.' })
+            })
+        })
+    })
+}
+
+export const authSignIn = function (res: any, req: any) {
+    const { username, password } = req.body
+    res.set('Cache-Control', 'no-store')
+
+    pool.getConnection(function (err: any, connection: any) {
+        if (err) {
+            console.error('DB connection error:', err)
+            res.status(500).send({ status: false, message: 'Unable to sign in.' })
             return;
         }
-        connection.query(selectAccountsQuery, function (err: any, result: any, fields: any) {
+
+        const signInQuery = 'SELECT id FROM accounts WHERE username = ? AND password = ? LIMIT 1'
+        connection.query(signInQuery, [username, password], function (err: any, result: any) {
             connection.release()
             if (err) {
-                console.error('Query error:', err);
+                console.error('Query error:', err)
+                res.status(500).send({ status: false, message: 'Unable to sign in.' })
                 return;
             }
-            var existing = false
-            for (var i = 0; i < result.length; i++) {
-                if (req.query.username === result[i].username && req.query.password === result[i].password) {
-                    res.send({
-                        status: true,
-                        message: 'Successfully signed in.'
-                    })
-                    existing = true
-                }
-            }
-            if (!existing) {
-                res.send({
-                    status: false,
-                    message: 'You failed to sign in.'
-                })
-            }
+
+            res.send(result.length > 0
+                ? { status: true, message: 'Successfully signed in.' }
+                : { status: false, message: 'You failed to sign in.' })
         })
     })
 
 }
 
 export const cookieValidation = function (res: any, req: any) {
-
-    const selectAccountsQuery = "SELECT username, password FROM accounts"
+    const { username, password } = req.body
+    res.set('Cache-Control', 'no-store')
 
     pool.getConnection(function (err: any, connection: any) {
         if (err) {
-            console.error('DB connection error:', err);
+            console.error('DB connection error:', err)
+            res.status(500).send({ status: false })
             return;
         }
-        connection.query(selectAccountsQuery, function (err: any, result: any, fields: any) {
+
+        const query = 'SELECT id FROM accounts WHERE username = ? AND password = ? LIMIT 1'
+        connection.query(query, [username, password], function (err: any, result: any) {
             connection.release()
             if (err) {
-                console.error('Query error:', err);
+                console.error('Query error:', err)
+                res.status(500).send({ status: false })
                 return;
             }
-            var existing = false
-            for (var i = 0; i < result.length; i++) {
-                if (req.query.username === result[i].username && req.query.password === result[i].password) {
-                    res.send({
-                        status: true,
-                        username: req.query.username
-                    })
-                    existing = true
-                }
-            }
-            if (!existing) {
-                res.send({
-                    status: false
-                })
-            }
+
+            res.send(result.length > 0
+                ? { status: true, username }
+                : { status: false })
         })
     })
-
 }
 
 export const getUserDetailsByID = function (res: any, req: any) {

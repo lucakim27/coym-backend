@@ -18,11 +18,11 @@ router.post('/signUp', (req: any, res: any) => {
   authSignUp(res, req)
 })
 
-router.get('/signIn', (req: any, res: any) => {
+router.post('/signIn', (req: any, res: any) => {
   authSignIn(res, req)
 })
 
-router.get('/cookieValidation', (req: any, res: any) => {
+router.post('/cookieValidation', (req: any, res: any) => {
   cookieValidation(res, req)
 })
 
